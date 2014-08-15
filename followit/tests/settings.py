@@ -10,3 +10,5 @@ INSTALLED_APPS = (
     'followit',
     'followit.tests'
 )
+
+SECRET_KEY='supersekrit'
