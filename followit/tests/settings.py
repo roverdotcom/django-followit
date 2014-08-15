@@ -1,7 +1,7 @@
 import os
 
 DIRNAME = os.path.dirname(__file__)
-DATABASE_ENGINE = 'sqlite3'
+DATABASE_ENGINE = 'django.db.backends.sqlite3'
 DATABASE_NAME = os.path.join(DIRNAME, 'database.db')
 
 INSTALLED_APPS = (
