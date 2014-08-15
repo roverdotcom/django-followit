@@ -1,29 +1,19 @@
-"""A Django App allowing :class:`~django.contrib.auth.models.User` to 
-follow instances of any other django models, including other users
+"""Super-hacked version of followit for the AskbotUser model.
 
-To use this module:
-* add "followit" to the ``INSTALLED_APPS`` in your ``settings.py``
-* in your app's ``models.py`` add:
+In Askbot, followit is only used to get users following other users, so
+the changes made here are safe. However, changes to Askbot that see followit
+adopted for following other models will break this hack.
 
-    import followit
-    followit.register(Thing)
-
-* run ``python manage.py syncdb``
-* then anywhere in your code you can do the following:
-
-    user.follow(some_thing_instance)
-    user.unfollow(some_thing_instance)
-
-    user.get_followed_things() #note that "things" is from the name of class Thing
-    some_thing.get_followers()
-
-Copyright 2011 Evgeny Fadeev evgeny.fadeev@gmail.com
-The source code is available under BSD license.
+What's been done here is that User has been hard-replaced with AskbotUser,
+and the name of the relation created on AskbotUser has been hard-coded to
+user to preserve the usage of this module in Askbot.
 """
 REGISTRY = {}
 
+
 def get_model_name(model):
-    return model._meta.module_name
+    # return model._meta.module_name
+    return 'User'
 
 
 def get_bridge_class_name(model):
@@ -43,13 +33,15 @@ def get_bridge_model_for_object(obj):
     bridge_model_name = get_bridge_class_name(obj.__class__)
     return get_model(bridge_model_name)
 
+
 def get_object_followers(obj):
     """returns query set of users following the object"""
-    bridge_lookup_field = get_bridge_class_name(obj.__class__).lower()
-    obj_model_name = get_model_name(obj.__class__)
-    filter_criterion = 'followed_' + obj_model_name + '_records__object'
+    # bridge_lookup_field = get_bridge_class_name(obj.__class__).lower()
+    # obj_model_name = get_model_name(obj.__class__)
+    # filter_criterion = 'followed_' + obj_model_name + '_records__object'
+    filter_criterion = 'followed_user_records__object'
     filter = {filter_criterion: obj}
-    from django.contrib.auth.models import User
+    from askbot.models import User
     return User.objects.filter(**filter)
 
 
@@ -57,12 +49,13 @@ def make_followed_objects_getter(model):
     """returns query set of objects of a class ``model``
     that are followed by a user"""
 
-    #something like followX_set__user
+    # something like followX_set__user
     def followed_objects_getter(user):
         filter = {'follower_records__user': user}
         return model.objects.filter(**filter)
 
     return followed_objects_getter
+
 
 def test_follow_method(user, obj):
     """True if object ``obj`` is followed by the user,
@@ -71,8 +64,8 @@ def test_follow_method(user, obj):
     """
     bridge_model = get_bridge_model_for_object(obj)
     try:
-        #in django 1.2 there is method ``exists()``
-        bridge_model.objects.get(user = user, object = obj)
+        # in django 1.2 there is method ``exists()``
+        bridge_model.objects.get(user=user, object=obj)
         return True
     except bridge_model.DoesNotExist:
         return False
@@ -121,14 +114,8 @@ def register(model):
     """
     from followit import models as followit_models
     from django.db import models as django_models
-    try:
-        from django.contrib.auth import get_user_model
-    except ImportError: # django < 1.5
-        from django.contrib.auth.models import User
-    else:
-        User = get_user_model()
     from django.db.models.fields.related import ForeignKey
-    from django.contrib.auth.models import User
+    from askbot.models import User
 
     model_name = get_model_name(model)
     if model in REGISTRY:
@@ -142,7 +129,8 @@ def register(model):
     fields = {
         'user': ForeignKey(
                         User,
-                        related_name = 'followed_' + model_name + '_records'
+                        # related_name = 'followed_' + model_name + '_records'
+                        related_name = 'followed_user_records'
                     ),
         'object': ForeignKey(
                                 model,
@@ -162,7 +150,8 @@ def register(model):
     model.add_to_class('get_followers', get_object_followers)
 
     #3) patch ``User`` with method ``get_followed_Xs``
-    method_name = 'get_followed_' + model_name + 's'
+    # method_name = 'get_followed_' + model_name + 's'
+    method_name = 'get_followed_users'
     getter_method = make_followed_objects_getter(model)
     User.add_to_class(method_name, getter_method)
 
@@ -172,8 +161,10 @@ def register(model):
 
     #5) patch ``User`` with method ``follow_X``
     follow_method = make_follow_method(model)
-    User.add_to_class('follow_' + model_name, follow_method)
+    # User.add_to_class('follow_' + model_name, follow_method)
+    User.add_to_class('follow_user', follow_method)
 
     #6) patch ``User`` with method ``unfollow_X``
     unfollow_method = make_unfollow_method(model)
-    User.add_to_class('unfollow_' + model_name, unfollow_method)
+    # User.add_to_class('unfollow_' + model_name, unfollow_method)
+    User.add_to_class('unfollow_user', unfollow_method)
